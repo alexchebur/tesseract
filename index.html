@@ -49,17 +49,17 @@
 </head>
 <body>
     <h1>OCR с камеры (кириллица)</h1>
-    
+
     <video id="video" autoplay playsinline></video>
     <button id="captureBtn" disabled>Сделать снимок и распознать</button>
     <button id="downloadBtn" disabled>Скачать TXT</button>
     <div class="status" id="status">Загрузка Tesseract...</div>
-    
+
     <h3>Распознанный текст:</h3>
     <div id="result"></div>
 
-    <!-- Подключаем актуальную версию Tesseract.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/2.3.2/tesseract.min.js"></script>
+    <!-- Подключаем Tesseract локально -->
+    <script src="js/tesseract.min.js"></script>
     <script>
         class OCRApp {
             constructor() {
@@ -68,137 +68,116 @@
                 this.downloadBtn = document.getElementById('downloadBtn');
                 this.resultDiv = document.getElementById('result');
                 this.statusDiv = document.getElementById('status');
-                
+
                 this.capturedImages = [];
                 this.recognizedText = '';
                 this.worker = null;
-                
+
                 this.init();
             }
-            
+
             async init() {
                 try {
                     // Инициализируем Tesseract сначала
                     await this.initOCR();
-                    
+
                     // Затем запрашиваем доступ к камере
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment'
-                        }
-                    });
-                    this.video.srcObject = stream;
-                    
-                    // Активируем кнопку после успешной инициализации
-                    this.captureBtn.disabled = false;
-                    this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
-                } catch (error) {
-                    this.handleError('Ошибка инициализации: ' + error.message);
-                }
-            }
-            
-            async initOCR() {
-                try {
-                    this.worker = await Tesseract.createWorker({
-                        logger: info => {
-                            if (info.status === 'recognizing text') {
-                                this.updateStatus(`Распознавание: ${Math.round(info.progress * 100)}%`);
-                            } else if (info.status === 'loading tesseract core') {
-                                this.updateStatus('Загрузка OCR-движка...');
-                            }
                 }
             });
-            await this.worker.loadLanguage('rus');
-            await this.worker.initialize('rus');
-            this.updateStatus('Tesseract готов к работе');
-        } catch (error) {
-            throw new Error('Ошибка загрузки Tesseract: ' + error.message);
-        }
-    }
-    
-    setupEventListeners() {
-        this.captureBtn.addEventListener('click', () => this.captureAndRecognize());
-        this.downloadBtn.addEventListener('click', () => this.downloadTextFile());
-    }
-    
-    captureAndRecognize() {
-        if (!this.video.videoWidth || !this.video.videoHeight) {
-            this.handleError('Видеопоток не готов');
-            return;
-        }
-        
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
-        context.drawImage(this.video, 0, 0);
-        
-        const imageDataUrl = canvas.toDataURL('image/png');
-        this.capturedImages.push(imageDataUrl);
-        this.recognizeText(imageDataUrl);
-    }
-    
-    async recognizeText(imageDataUrl) {
-        this.updateStatus('Распознавание...');
-        this.captureBtn.disabled = true;
-        
-        try {
-            const { data: { text } } = await this.worker.recognize(imageDataUrl);
-            
-            if (text.trim()) {
-                this.recognizedText += text.trim() + '\n\n';
-                this.resultDiv.textContent = this.recognizedText;
-                this.downloadBtn.disabled = false;
-                this.updateStatus('Готово! Текст распознан');
-            } else {
-                this.updateStatus('Текст не распознан. Попробуйте другой снимок');
-            }
-        } catch (error) {
-            this.handleError('Ошибка распознавания: ' + error.message);
-        } finally {
+            this.video.srcObject = stream;
+
+            // Активируем кнопку после успешной инициализации
             this.captureBtn.disabled = false;
+            this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
+        } catch (error) {
+            this.handleError('Ошибка инициализации: ' + error.message);
         }
     }
-    
-    downloadTextFile() {
-        if (!this.recognizedText.trim()) {
-            alert('Нет текста для сохранения');
-            return;
+
+    async initOCR() {
+        try {
+            this.worker = await Tesseract.createWorker({
+                logger: info => {
+                    if (info.status === 'recognizing text') {
+                this.updateStatus(`Распознавание: ${Math.round(info.progress * 100)}%`);
+            } else if (info.status === 'loading language') {
+                this.updateStatus('Загрузка языковых данных...');
+            } else if (info.status === 'initializing') {
+                this.updateStatus('Инициализация OCR...');
+            }
         }
-        
-        const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    });
+    await this.worker.loadLanguage('rus');
+    await this.worker.initialize('rus', {
+        // Указываем путь к языковым данным, если они лежат в отдельной папке
+        tessedit_ocr_engine_mode: 1,
+        // Для GitHub Pages убедитесь, что путь корректен: lang/rus.traineddata.gz
+    });
+    this.updateStatus('Tesseract готов к работе');
+} catch (error) {
+    throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+}
+}
+
+setupEventListeners() {
+    this.captureBtn.addEventListener('click', () => this.captureAndRecognize());
+    this.downloadBtn.addEventListener('click', () => this.downloadTextFile());
+}
+
+captureAndRecognize() {
+    if (!this.video.videoWidth || !this.video.videoHeight) {
+        this.handleError('Видеопоток не готов');
+        return;
     }
-    
-    updateStatus(message) {
-        this.statusDiv.textContent = message;
-    }
-    
-    handleError(message) {
-        this.updateStatus('ОШИБКА: ' + message);
-        console.error(message);
-        alert(message);
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = this.video.videoWidth;
+    canvas.height = this.video.videoHeight;
+    context.drawImage(this.video, 0, 0);
+
+    const imageDataUrl = canvas.toDataURL('image/png');
+    this.capturedImages.push(imageDataUrl);
+    this.recognizeText(imageDataUrl);
+}
+
+async recognizeText(imageDataUrl) {
+    this.updateStatus('Распознавание...');
+    this.captureBtn.disabled = true;
+
+    try {
+        const { data: { text } } = await this.worker.recognize(imageDataUrl);
+
+        if (text.trim()) {
+            this.recognizedText += text.trim() + '\n\n';
+            this.resultDiv.textContent = this.recognizedText;
+            this.downloadBtn.disabled = false;
+            this.updateStatus('Готово! Текст распознан');
+        } else {
+            this.updateStatus('Текст не распознан. Попробуйте другой снимок');
+        }
+    } catch (error) {
+        this.handleError('Ошибка распознавания: ' + error.message);
+    } finally {
+        this.captureBtn.disabled = false;
     }
 }
 
-// Запускаем приложение после полной загрузки страницы и библиотеки
-document.addEventListener('DOMContentLoaded', () => {
-    // Ждём загрузки Tesseract
-    if (typeof Tesseract !== 'undefined') {
-        new OCRApp();
-    } else {
-        document.getElementById('status').textContent = 'Ошибка: Tesseract не загрузился';
-        console.error('Tesseract library not loaded');
+downloadTextFile() {
+    if (!this.recognizedText.trim()) {
+        alert('Нет текста для сохранения');
+        return;
     }
-});
-    </script>
-</body>
-</html>
+
+    const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.
