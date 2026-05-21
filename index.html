@@ -122,26 +122,23 @@
 
     async initOCR() {
         try {
-            // Создаём воркер без логгера
-            this.worker = await Tesseract.createWorker();
+            this.worker = await Tesseract.createWorker({
+                logger: info => {
+                    const status = info.status;
+                    const progress = info.progress;
 
-            // Настраиваем логгер после инициализации
-            this.worker.setLogger(info => {
-                const status = info.status;
-                const progress = info.progress;
-
-                if (status === 'recognizing text' && progress !== undefined) {
-                    this.updateProgress(`${Math.round(progress * 100)}%`);
-                } else if (status === 'loading language') {
-                    this.updateStatus('Загрузка языковых данных...');
-                } else if (status === 'initializing') {
-                    this.updateStatus('Инициализация OCR...');
-                } else if (status.includes('loaded')) {
-                    this.updateStatus('Компоненты загружены');
+                    if (status === 'recognizing text' && progress !== undefined) {
+                        this.updateProgress(`${Math.round(progress * 100)}%`);
+                    } else if (status === 'loading language') {
+                        this.updateStatus('Загрузка языковых данных...');
+                    } else if (status === 'initializing') {
+                        this.updateStatus('Инициализация OCR...');
+                    } else if (status.includes('loaded')) {
+                        this.updateStatus('Компоненты загружены');
+                    }
                 }
             });
 
-            // Загружаем язык с явным указанием пути
             await this.worker.loadLanguage('rus');
             await this.worker.initialize('rus', {
                 langPath: './lang/'
@@ -152,6 +149,18 @@
             throw new Error('Ошибка загрузки Tesseract: ' + error.message);
         }
     }
+
+                // Загружаем язык с явным указанием пути
+                await this.worker.loadLanguage('rus');
+                await this.worker.initialize('rus', {
+                    langPath: './lang/'
+                });
+
+                this.updateStatus('Tesseract готов к работе');
+            } catch (error) {
+                throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+            }
+        }
 
     showLoading(show) {
         this.loadingDiv.style.display = show ? 'block' : 'none';
