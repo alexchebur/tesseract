@@ -120,23 +120,23 @@
         }
     }
 
-    async initOCR() {
-        try {
-            this.worker = await Tesseract.createWorker();
+        async initOCR() {
+            try {
+                this.worker = await Tesseract.createWorker();
 
-            // Загружаем язык
-            await this.worker.loadLanguage('rus');
+                // Загружаем язык
+                await this.worker.loadLanguage('rus');
+    
+                // Инициализируем с указанием пути к языковым данным
+                await this.worker.initialize('rus', {
+                    langPath: './lang/'
+                });
 
-            // Инициализируем с указанием пути к языковым данным
-            await this.worker.initialize('rus', {
-                langPath: './lang/'
-            });
-
-            this.updateStatus('Tesseract готов к работе');
-        } catch (error) {
-            throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+                this.updateStatus('Tesseract готов к работе');
+            } catch (error) {
+                throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+            }
         }
-    }
 
 
     // Загружаем язык с явным указанием пути
