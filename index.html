@@ -2,118 +2,341 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OCR с камеры (кириллица)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>OCR с камеры (кириллица) - Улучшенная версия</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 15px;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #1a1a1a;
+            text-align: center;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            background: #000;
+        }
+
         #video {
             width: 100%;
-            border: 2px solid #333;
-            border-radius: 8px;
-        }
-        button {
             display: block;
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
+            transform: scaleX(-1); /* Зеркалируем для фронталки, убираем если задняя */
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 140px;
+            padding: 14px 20px;
             background: #007bff;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
+
+        button:hover:not(:disabled) {
+            background: #0056b3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            transform: none;
         }
-        #result {
-            margin-top: 20px;
-            white-space: pre-wrap;
-            border: 1px solid #ddd;
-            padding: 15px;
-            min-height: 100px;
-            border-radius: 4px;
+
+        .btn-secondary {
+            background: #28a745;
         }
-        .status {
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #218838;
+            box-shadow: 0 4px 12px rgba(40,167,69,0.3);
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 14px;
             color: #666;
-            font-style: italic;
-            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+
+        .status-icon {
+            font-size: 20px;
+        }
+
+        .progress-container {
+            margin: 15px 0;
+            background: #e9ecef;
+            border-radius: 20px;
+            overflow: hidden;
+            height: 6px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #00d4ff);
+            transition: width 0.3s ease;
+            border-radius: 20px;
+        }
+
+        .result-container {
+            margin-top: 20px;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        h3 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .char-count {
+            font-size: 14px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        #result {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 2px solid #e0e0e0;
+            padding: 20px;
+            min-height: 150px;
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        #result:empty::before {
+            content: 'Текст появится здесь после распознавания...';
+            color: #999;
+            font-style: italic;
+        }
+
         .loading {
             text-align: center;
-            padding: 20px;
+            padding: 30px;
             color: #007bff;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fff3f3;
+            border: 1px solid #ffcdd2;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            button {
+                font-size: 14px;
+                padding: 12px 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>OCR с камеры (кириллица)</h1>
+    <div class="container">
+        <h1>📸 Распознавание текста с камеры</h1>
+        
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+        
+        <div class="controls">
+            <button id="captureBtn" disabled>
+                <span>📷</span> Снять и распознать
+            </button>
+            <button id="downloadBtn" class="btn-secondary" disabled>
+                <span>💾</span> Скачать TXT
+            </button>
+            <button id="clearBtn" class="btn-secondary" style="background: #dc3545;">
+                <span>🗑️</span> Очистить
+            </button>
+        </div>
 
-    <video id="video" autoplay playsinline></video>
-    <button id="captureBtn" disabled>Сделать снимок и распознать</button>
-    <button id="downloadBtn" disabled>Скачать TXT</button>
+        <div class="error-message" id="errorMessage"></div>
 
-    <div class="status" id="status">Загрузка Tesseract...</div>
-    <div id="loadingIndicator" class="loading">
-        <p>Идёт инициализация OCR...</p>
-        <p id="progressText">0%</p>
+        <div class="status-bar">
+            <span class="status-icon">ℹ️</span>
+            <span id="status">Загрузка Tesseract...</span>
+        </div>
+
+        <div id="loadingIndicator" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px;">Идёт инициализация OCR...</p>
+            <p id="progressText" style="font-size: 14px; color: #666;">0%</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="result-container">
+            <div class="result-header">
+                <h3>📝 Распознанный текст:</h3>
+                <span class="char-count" id="charCount">0 символов</span>
+            </div>
+            <div id="result"></div>
+        </div>
     </div>
 
-    <h3>Распознанный текст:</h3>
-    <div id="result"></div>
-
-    <!-- Подключаем Tesseract локально -->
+    <!-- Подключаем Tesseract -->
     <script src="./js/tesseract.min.js"></script>
+    
     <script>
         class OCRApp {
             constructor() {
                 this.video = document.getElementById('video');
                 this.captureBtn = document.getElementById('captureBtn');
                 this.downloadBtn = document.getElementById('downloadBtn');
+                this.clearBtn = document.getElementById('clearBtn');
                 this.resultDiv = document.getElementById('result');
                 this.statusDiv = document.getElementById('status');
                 this.loadingDiv = document.getElementById('loadingIndicator');
+                this.errorDiv = document.getElementById('errorMessage');
+                this.charCount = document.getElementById('charCount');
+                this.progressBar = document.getElementById('progressBar');
+                this.progressText = document.getElementById('progressText');
 
-                this.capturedImages = [];
                 this.recognizedText = '';
                 this.worker = null;
+                this.isProcessing = false;
 
-                // Ждём полной загрузки Tesseract
+                // Проверяем наличие Tesseract
                 if (typeof Tesseract !== 'undefined') {
                     this.init();
                 } else {
-                    this.handleError('Библиотека Tesseract не загрузилась');
+                    this.showError('Библиотека Tesseract не загрузилась. Проверьте подключение.');
                 }
             }
 
             async init() {
                 try {
-                    // Показываем индикатор загрузки
                     this.showLoading(true);
+                    this.hideError();
 
-                    // Инициализируем Tesseract
+                    // Инициализация OCR с лучшей моделью
                     await this.initOCR();
 
-                    // Запрашиваем доступ к камере с высоким разрешением
+                    // Запрос камеры с максимальным разрешением
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
+                            width: { ideal: 4096 },
+                            height: { ideal: 2160 },
+                            aspectRatio: { ideal: 1.777 }
                         }
                     });
+                    
                     this.video.srcObject = stream;
+                    
+                    // Ждём готовности видео
+                    await new Promise((resolve) => {
+                        this.video.onloadedmetadata = () => {
+                            resolve();
+                        };
+                    });
 
-                    // Активируем кнопки
                     this.captureBtn.disabled = false;
-                    this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
+                    this.updateStatus('✅ Камера готова. Нажмите кнопку для распознавания');
                     this.showLoading(false);
+                    
                 } catch (error) {
                     this.handleError('Ошибка инициализации: ' + error.message);
                     this.showLoading(false);
@@ -122,26 +345,254 @@
 
             async initOCR() {
                 try {
-                    this.updateStatus('Создание OCR‑воркера...');
+                    this.updateStatus('🔄 Загрузка языковой модели (rus_best)...');
                     
-                    // Создаем воркер с русским и английским языками, OEM 3 (комбинированный режим)
-                    this.worker = await Tesseract.createWorker('rus+eng', 3, {
+                    // Используем лучшую модель с CDN
+                    this.worker = await Tesseract.createWorker('rus', 3, {
+                        langPath: 'https://tessdata.main.quest/',
+                        // Резервный CDN если основной недоступен:
+                        // langPath: 'https://raw.githubusercontent.com/naptha/tessdata_best/main/',
                         logger: info => {
                             if (info.status === 'recognizing text') {
-                                this.updateProgress(`${Math.round(info.progress * 100)}%`);
+                                const progress = Math.round(info.progress * 100);
+                                this.updateProgress(progress);
+                            } else if (info.status === 'loading language traineddata') {
+                                this.updateStatus('📥 Загрузка модели: ' + Math.round(info.progress * 100) + '%');
+                                this.updateProgress(Math.round(info.progress * 100));
                             }
                         }
                     });
-                    
-                    // Устанавливаем режим сегментации страницы (автоматический)
+
+                    // Настройка параметров для лучшего качества
                     await this.worker.setParameters({
-                        tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                        tessedit_ocr_engine_mode: 3,
+                        textord_heavy_nr: 1,
+                        textord_tabfind_find_tables: 0,
                     });
+
+                    this.updateStatus('✅ Модель готова к работе');
                     
-                    this.updateStatus('Tesseract готов к работе');
                 } catch (error) {
-                    throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+                    // Если лучшая модель недоступна, пробуем стандартную
+                    console.warn('Не удалось загрузить rus_best, пробуем стандартную:', error);
+                    this.updateStatus('⚠️ Пробуем стандартную модель...');
+                    
+                    try {
+                        this.worker = await Tesseract.createWorker('rus', 3, {
+                            logger: info => {
+                                if (info.status === 'recognizing text') {
+                                    this.updateProgress(Math.round(info.progress * 100));
+                                }
+                            }
+                        });
+                        
+                        await this.worker.setParameters({
+                            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                        });
+                        
+                        this.updateStatus('✅ Стандартная модель готова');
+                    } catch (fallbackError) {
+                        throw new Error('Не удалось загрузить ни одну модель: ' + fallbackError.message);
+                    }
                 }
+            }
+
+            captureAndRecognize() {
+                if (this.isProcessing) {
+                    this.updateStatus('⚠️ Подождите, идёт обработка...');
+                    return;
+                }
+
+                if (!this.video.videoWidth || !this.video.videoHeight) {
+                    this.showError('Видеопоток не готов');
+                    return;
+                }
+
+                this.isProcessing = true;
+                this.captureBtn.disabled = true;
+
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Оптимальный размер для OCR
+                    const MAX_WIDTH = 2500;
+                    let width = this.video.videoWidth;
+                    let height = this.video.videoHeight;
+                    
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // Отражаем по горизонтали если нужно (для фронталки)
+                    ctx.save();
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(this.video, -width, 0, width, height);
+                    ctx.restore();
+
+                    // Если камера задняя, используем обычное отображение:
+                    // ctx.drawImage(this.video, 0, 0, width, height);
+
+                    // Применяем улучшенную предобработку
+                    this.preprocessImage(canvas, ctx, width, height);
+
+                    const imageDataUrl = canvas.toDataURL('image/png', 1.0);
+                    this.recognizeText(imageDataUrl);
+                    
+                } catch (error) {
+                    this.handleError('Ошибка при захвате: ' + error.message);
+                    this.isProcessing = false;
+                    this.captureBtn.disabled = false;
+                }
+            }
+
+            preprocessImage(canvas, ctx, width, height) {
+                // Получаем данные изображения
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                // Шаг 1: Конвертация в оттенки серого
+                const gray = new Float32Array(width * height);
+                for (let i = 0; i < data.length; i += 4) {
+                    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    gray[i / 4] = luminance;
+                }
+
+                // Шаг 2: Адаптивная бинаризация (метод Сауволы)
+                const windowSize = Math.floor(Math.min(width, height) / 40); // ~2.5% от размера
+                const k = 0.2; // Чувствительность
+                const R = 128; // Стандартное отклонение
+
+                // Вычисляем интегральные изображения для быстрого расчёта
+                const integralImg = new Float64Array((width + 1) * (height + 1));
+                const integralSqImg = new Float64Array((width + 1) * (height + 1));
+
+                for (let y = 0; y < height; y++) {
+                    let sum = 0;
+                    let sumSq = 0;
+                    for (let x = 0; x < width; x++) {
+                        const idx = y * width + x;
+                        const val = gray[idx];
+                        sum += val;
+                        sumSq += val * val;
+                        
+                        const aboveIdx = y * (width + 1) + (x + 1);
+                        const currentIdx = (y + 1) * (width + 1) + (x + 1);
+                        
+                        integralImg[currentIdx] = integralImg[aboveIdx] + sum;
+                        integralSqImg[currentIdx] = integralSqImg[aboveIdx] + sumSq;
+                    }
+                }
+
+                // Применяем адаптивный порог
+                const halfWindow = Math.floor(windowSize / 2);
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const x1 = Math.max(0, x - halfWindow);
+                        const y1 = Math.max(0, y - halfWindow);
+                        const x2 = Math.min(width - 1, x + halfWindow);
+                        const y2 = Math.min(height - 1, y + halfWindow);
+                        
+                        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+                        
+                        // Сумма в окне через интегральное изображение
+                        const sum = integralImg[(y2 + 1) * (width + 1) + (x2 + 1)]
+                                  - integralImg[(y1) * (width + 1) + (x2 + 1)]
+                                  - integralImg[(y2 + 1) * (width + 1) + (x1)]
+                                  + integralImg[(y1) * (width + 1) + (x1)];
+                        
+                        const sumSq = integralSqImg[(y2 + 1) * (width + 1) + (x2 + 1)]
+                                    - integralSqImg[(y1) * (width + 1) + (x2 + 1)]
+                                    - integralSqImg[(y2 + 1) * (width + 1) + (x1)]
+                                    + integralSqImg[(y1) * (width + 1) + (x1)];
+                        
+                        const mean = sum / count;
+                        const variance = (sumSq / count) - (mean * mean);
+                        const stdDev = Math.sqrt(Math.max(0, variance));
+                        
+                        const threshold = mean * (1 + k * ((stdDev / R) - 1));
+                        
+                        const idx = (y * width + x) * 4;
+                        const pixelValue = gray[y * width + x];
+                        const binaryValue = pixelValue < threshold ? 0 : 255;
+                        
+                        data[idx] = binaryValue;
+                        data[idx + 1] = binaryValue;
+                        data[idx + 2] = binaryValue;
+                    }
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            async recognizeText(imageDataUrl) {
+                this.updateStatus('🔍 Распознавание текста...');
+                
+                try {
+                    const { data: { text, confidence } } = await this.worker.recognize(imageDataUrl);
+
+                    if (text.trim()) {
+                        this.recognizedText += text.trim() + '\n\n';
+                        this.resultDiv.textContent = this.recognizedText;
+                        this.downloadBtn.disabled = false;
+                        this.updateCharCount();
+                        
+                        const avgConfidence = confidence ? Math.round(confidence) : 'N/A';
+                        this.updateStatus(`✅ Распознано (точность: ${avgConfidence}%)`);
+                    } else {
+                        this.updateStatus('⚠️ Текст не найден. Попробуйте снять чётче');
+                    }
+                } catch (error) {
+                    this.handleError('Ошибка распознавания: ' + error.message);
+                } finally {
+                    this.isProcessing = false;
+                    this.captureBtn.disabled = false;
+                }
+            }
+
+            clearText() {
+                this.recognizedText = '';
+                this.resultDiv.textContent = '';
+                this.downloadBtn.disabled = true;
+                this.updateCharCount();
+                this.updateStatus('🗑️ Текст очищен');
+            }
+
+            downloadTextFile() {
+                if (!this.recognizedText.trim()) {
+                    alert('Нет текста для сохранения');
+                    return;
+                }
+
+                const timestamp = new Date().toISOString()
+                    .replace(/[:.]/g, '-')
+                    .replace('T', '_')
+                    .substring(0, 19);
+                
+                const blob = new Blob(['\ufeff' + this.recognizedText], { 
+                    type: 'text/plain;charset=utf-8' 
+                });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `распознанный_текст_${timestamp}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.updateStatus('💾 Файл сохранён');
+            }
+
+            updateCharCount() {
+                const count = this.recognizedText.replace(/\s/g, '').length;
+                this.charCount.textContent = `${count} символов`;
             }
 
             showLoading(show) {
@@ -152,117 +603,32 @@
                 this.statusDiv.textContent = message;
             }
 
-            updateProgress(progressText) {
-                const progressDiv = document.getElementById('progressText');
-                if (progressDiv) {
-                    progressDiv.textContent = progressText;
-                }
+            updateProgress(progress) {
+                this.progressBar.style.width = progress + '%';
+                this.progressText.textContent = progress + '%';
             }
 
-            captureAndRecognize() {
-                if (!this.video.videoWidth || !this.video.videoHeight) {
-                    this.handleError('Видеопоток не готов');
-                    return;
-                }
-
-                // Создаем canvas для захвата кадра
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Оптимальная ширина для OCR (баланс качество/скорость)
-                const MAX_WIDTH = 1500;
-                let width = this.video.videoWidth;
-                let height = this.video.videoHeight;
-                
-                if (width > MAX_WIDTH) {
-                    height = Math.round((height * MAX_WIDTH) / width);
-                    width = MAX_WIDTH;
-                }
-                
-                canvas.width = width;
-                canvas.height = height;
-                
-                // Рисуем изображение с камеры
-                ctx.drawImage(this.video, 0, 0, width, height);
-                
-                // === ПРЕДОБРАБОТКА ИЗОБРАЖЕНИЯ ===
-                const imageData = ctx.getImageData(0, 0, width, height);
-                const data = imageData.data;
-                
-                // Переводим в оттенки серого и применяем бинаризацию
-                for (let i = 0; i < data.length; i += 4) {
-                    // Вычисляем яркость пикселя
-                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                    
-                    // Бинаризация с порогом (делаем текст черным, фон белым)
-                    const binary = gray > 110 ? 255 : 0;
-                    
-                    data[i] = binary;     // R
-                    data[i + 1] = binary; // G
-                    data[i + 2] = binary; // B
-                    // data[i + 3] - альфа не меняем
-                }
-                
-                ctx.putImageData(imageData, 0, 0);
-                
-                const imageDataUrl = canvas.toDataURL('image/png');
-                this.capturedImages.push(imageDataUrl);
-                this.recognizeText(imageDataUrl);
+            showError(message) {
+                this.errorDiv.textContent = message;
+                this.errorDiv.classList.add('show');
             }
 
-            async recognizeText(imageDataUrl) {
-                this.updateStatus('Распознавание...');
-                this.captureBtn.disabled = true;
-
-                try {
-                    const { data: { text } } = await this.worker.recognize(imageDataUrl);
-
-                    if (text.trim()) {
-                        this.recognizedText += text.trim() + '\n\n';
-                        this.resultDiv.textContent = this.recognizedText;
-                        this.downloadBtn.disabled = false;
-                        this.updateStatus('Готово! Текст распознан');
-                    } else {
-                        this.updateStatus('Текст не распознан. Попробуйте другой снимок');
-                    }
-                } catch (error) {
-                    this.handleError('Ошибка распознавания: ' + error.message);
-                } finally {
-                    this.captureBtn.disabled = false;
-                }
-            }
-
-            downloadTextFile() {
-                if (!this.recognizedText.trim()) {
-                    alert('Нет текста для сохранения');
-                    return;
-                }
-
-                const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            hideError() {
+                this.errorDiv.classList.remove('show');
             }
 
             handleError(message) {
-                this.updateStatus('ОШИБКА: ' + message);
+                this.showError(message);
+                this.updateStatus('❌ ' + message);
                 console.error(message);
-                alert(message);
             }
         }
 
-        // Запускаем приложение после полной загрузки страницы
+        // Запуск приложения
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const app = new OCRApp();
 
-                // Добавляем обработчики событий
                 document.getElementById('captureBtn').addEventListener('click', () => {
                     app.captureAndRecognize();
                 });
@@ -270,11 +636,24 @@
                 document.getElementById('downloadBtn').addEventListener('click', () => {
                     app.downloadTextFile();
                 });
+
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    app.clearText();
+                });
+
             } catch (error) {
-                console.error('Критическая ошибка при запуске приложения:', error);
+                console.error('Критическая ошибка:', error);
                 alert('Не удалось запустить приложение: ' + error.message);
             }
         });
+
+        // Обработка ошибок загрузки Tesseract
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'SCRIPT') {
+                console.error('Ошибка загрузки Tesseract:', e);
+                alert('Не удалось загрузить библиотеку Tesseract. Проверьте подключение к интернету.');
+            }
+        }, true);
     </script>
 </body>
 </html>
