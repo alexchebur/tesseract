@@ -62,6 +62,7 @@
     <div class="status" id="status">Загрузка Tesseract...</div>
     <div id="loadingIndicator" class="loading">
         <p>Идёт инициализация OCR...</p>
+        <p id="progressText">0%</p>
     </div>
 
     <h3>Распознанный текст:</h3>
@@ -96,14 +97,12 @@
                     // Показываем индикатор загрузки
                     this.showLoading(true);
 
-                    // Инициализируем Tesseract без логгера
-                    await this.initOCR();
+                    // Инициализируем Tesseract без loadLanguage (для версии 6.0.1)
+            await this.initOCR();
 
-                    // Запрашиваем доступ к камере
+            // Запрашиваем доступ к камере
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment'
-                }
+                video: { facingMode: 'environment' }
             });
             this.video.srcObject = stream;
 
@@ -122,12 +121,14 @@
             this.updateStatus('Создание OCR‑воркера...');
             this.worker = await Tesseract.createWorker();
 
-            this.updateStatus('Загрузка языковых данных...');
-            await this.worker.loadLanguage('rus');
-
-            this.updateStatus('Инициализация OCR...');
+            this.updateStatus('Инициализация OCR с русским языком...');
             await this.worker.initialize('rus', {
-                langPath: './lang/'
+                langPath: './lang/',
+                logger: info => {
+                    if (info.status === 'recognizing text') {
+                this.updateProgress(`${Math.round(info.progress * 100)}%`);
+            }
+        }
             });
 
             this.updateStatus('Tesseract готов к работе');
@@ -136,13 +137,19 @@
         }
     }
 
-
     showLoading(show) {
         this.loadingDiv.style.display = show ? 'block' : 'none';
     }
 
     updateStatus(message) {
         this.statusDiv.textContent = message;
+    }
+
+    updateProgress(progressText) {
+        const progressDiv = document.getElementById('progressText');
+        if (progressDiv) {
+            progressDiv.textContent = progressText;
+        }
     }
 
     captureAndRecognize() {
