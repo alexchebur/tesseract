@@ -68,7 +68,7 @@
     <h3>Распознанный текст:</h3>
     <div id="result"></div>
 
-    <!-- Подключаем Tesseract локально -->
+    <!-- Подключаем Tesseract локально (убедитесь, что файл в ./js/tesseract.min.js) -->
     <script src="./js/tesseract.min.js"></script>
     <script>
         class OCRApp {
@@ -94,146 +94,141 @@
 
             async init() {
                 try {
-                    // Показываем индикатор загрузки
                     this.showLoading(true);
 
-                    // Инициализируем Tesseract без loadLanguage (для версии 6.0.1)
-            await this.initOCR();
+                    // Инициализация OCR (новый API Tesseract v6)
+                    await this.initOCR();
 
-            // Запрашиваем доступ к камере
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-            });
-            this.video.srcObject = stream;
+                    // Запрашиваем доступ к камере
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' }
+                    });
+                    this.video.srcObject = stream;
 
-            // Активируем кнопки
-            this.captureBtn.disabled = false;
-            this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
-            this.showLoading(false);
-        } catch (error) {
-            this.handleError('Ошибка инициализации: ' + error.message);
-            this.showLoading(false);
-        }
-    }
+                    this.captureBtn.disabled = false;
+                    this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
+                    this.showLoading(false);
+                } catch (error) {
+                    this.handleError('Ошибка инициализации: ' + error.message);
+                    this.showLoading(false);
+                }
+            }
 
-    async initOCR() {
-        try {
-            this.updateStatus('Создание OCR‑воркера...');
-            this.worker = await Tesseract.createWorker();
+            async initOCR() {
+                try {
+                    this.updateStatus('Создание OCR‑воркера...');
+                    // В Tesseract v6 createWorker принимает язык, OEM и опции сразу
+                    // Параметр OEM: 1 = LSTM (нейросеть), подходит для кириллицы
+                    this.worker = await Tesseract.createWorker('rus', 1, {
+                        langPath: './lang/',           // папка с файлом rus.traineddata
+                        logger: info => {
+                            if (info.status === 'recognizing text') {
+                                this.updateProgress(`${Math.round(info.progress * 100)}%`);
+                            }
+                        }
+                    });
+                    this.updateStatus('Tesseract готов к работе');
+                } catch (error) {
+                    throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+                }
+            }
 
-            this.updateStatus('Инициализация OCR с русским языком...');
-            await this.worker.initialize('rus', {
-                langPath: './lang/',
-                logger: info => {
-                    if (info.status === 'recognizing text') {
-                this.updateProgress(`${Math.round(info.progress * 100)}%`);
+            showLoading(show) {
+                this.loadingDiv.style.display = show ? 'block' : 'none';
+            }
+
+            updateStatus(message) {
+                this.statusDiv.textContent = message;
+            }
+
+            updateProgress(progressText) {
+                const progressDiv = document.getElementById('progressText');
+                if (progressDiv) {
+                    progressDiv.textContent = progressText;
+                }
+            }
+
+            captureAndRecognize() {
+                if (!this.video.videoWidth || !this.video.videoHeight) {
+                    this.handleError('Видеопоток не готов');
+                    return;
+                }
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = this.video.videoWidth;
+                canvas.height = this.video.videoHeight;
+                context.drawImage(this.video, 0, 0);
+
+                const imageDataUrl = canvas.toDataURL('image/png');
+                this.capturedImages.push(imageDataUrl);
+                this.recognizeText(imageDataUrl);
+            }
+
+            async recognizeText(imageDataUrl) {
+                this.updateStatus('Распознавание...');
+                this.captureBtn.disabled = true;
+
+                try {
+                    const { data: { text } } = await this.worker.recognize(imageDataUrl);
+
+                    if (text.trim()) {
+                        this.recognizedText += text.trim() + '\n\n';
+                        this.resultDiv.textContent = this.recognizedText;
+                        this.downloadBtn.disabled = false;
+                        this.updateStatus('Готово! Текст распознан');
+                    } else {
+                        this.updateStatus('Текст не распознан. Попробуйте другой снимок');
+                    }
+                } catch (error) {
+                    this.handleError('Ошибка распознавания: ' + error.message);
+                } finally {
+                    this.captureBtn.disabled = false;
+                }
+            }
+
+            downloadTextFile() {
+                if (!this.recognizedText.trim()) {
+                    alert('Нет текста для сохранения');
+                    return;
+                }
+
+                const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            handleError(message) {
+                this.updateStatus('ОШИБКА: ' + message);
+                console.error(message);
+                alert(message);
             }
         }
-            });
 
-            this.updateStatus('Tesseract готов к работе');
-        } catch (error) {
-            throw new Error('Ошибка загрузки Tesseract: ' + error.message);
-        }
-    }
+        // Запускаем приложение после полной загрузки страницы
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const app = new OCRApp();
 
-    showLoading(show) {
-        this.loadingDiv.style.display = show ? 'block' : 'none';
-    }
+                document.getElementById('captureBtn').addEventListener('click', () => {
+                    app.captureAndRecognize();
+                });
 
-    updateStatus(message) {
-        this.statusDiv.textContent = message;
-    }
-
-    updateProgress(progressText) {
-        const progressDiv = document.getElementById('progressText');
-        if (progressDiv) {
-            progressDiv.textContent = progressText;
-        }
-    }
-
-    captureAndRecognize() {
-        if (!this.video.videoWidth || !this.video.videoHeight) {
-            this.handleError('Видеопоток не готов');
-            return;
-        }
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
-        context.drawImage(this.video, 0, 0);
-
-        const imageDataUrl = canvas.toDataURL('image/png');
-        this.capturedImages.push(imageDataUrl);
-        this.recognizeText(imageDataUrl);
-    }
-
-    async recognizeText(imageDataUrl) {
-        this.updateStatus('Распознавание...');
-        this.captureBtn.disabled = true;
-
-        try {
-            const { data: { text } } = await this.worker.recognize(imageDataUrl);
-
-            if (text.trim()) {
-                this.recognizedText += text.trim() + '\n\n';
-                this.resultDiv.textContent = this.recognizedText;
-                this.downloadBtn.disabled = false;
-                this.updateStatus('Готово! Текст распознан');
-            } else {
-                this.updateStatus('Текст не распознан. Попробуйте другой снимок');
+                document.getElementById('downloadBtn').addEventListener('click', () => {
+                    app.downloadTextFile();
+                });
+            } catch (error) {
+                console.error('Критическая ошибка при запуске приложения:', error);
+                alert('Не удалось запустить приложение: ' + error.message);
             }
-        } catch (error) {
-            this.handleError('Ошибка распознавания: ' + error.message);
-        } finally {
-            this.captureBtn.disabled = false;
-        }
-    }
-
-    downloadTextFile() {
-        if (!this.recognizedText.trim()) {
-            alert('Нет текста для сохранения');
-            return;
-        }
-
-        const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    handleError(message) {
-        this.updateStatus('ОШИБКА: ' + message);
-        console.error(message);
-        alert(message);
-    }
-}
-
-// Запускаем приложение после полной загрузки страницы
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const app = new OCRApp();
-
-        // Добавляем обработчики событий
-        document.getElementById('captureBtn').addEventListener('click', () => {
-            app.captureAndRecognize();
         });
-
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            app.downloadTextFile();
-        });
-    } catch (error) {
-        console.error('Критическая ошибка при запуске приложения:', error);
-        alert('Не удалось запустить приложение: ' + error.message);
-    }
-});
-</script>
+    </script>
 </body>
 </html>
