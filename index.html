@@ -130,11 +130,12 @@
                 langPath: './lang/'
             });
 
-            this.updateStatus('Tesseract готов к работе. Камера активируется...');
+            this.updateStatus('Tesseract готов к работе');
         } catch (error) {
             throw new Error('Ошибка загрузки Tesseract: ' + error.message);
         }
     }
+
 
     showLoading(show) {
         this.loadingDiv.style.display = show ? 'block' : 'none';
