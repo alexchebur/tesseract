@@ -1,3 +1,17 @@
+Разберу возможные причины зависания и дам исправленный код с улучшенной обработкой ошибок.
+
+
+## Основные причины зависания
+
+1. **Длительная загрузка Tesseract** — инициализация может занимать 10–30 секунд на мобильных устройствах.
+2. **Блокировка интерфейса** — синхронные операции в асинхронном коде.
+3. **Ошибки загрузки языковых данных** без отображения пользователю.
+4. **Отсутствие индикации прогресса** — пользователь не видит, что идёт загрузка.
+5. **Некорректная обработка ошибок** — приложение «зависает» вместо сообщения об ошибке.
+
+## Исправленный код с улучшенной логикой
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -163,4 +177,65 @@ captureAndRecognize() {
 
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.width
+    canvas.width = this.video.videoWidth;
+    canvas.height = this.video.videoHeight;
+    context.drawImage(this.video, 0, 0);
+
+    const imageDataUrl = canvas.toDataURL('image/png');
+    this.capturedImages.push(imageDataUrl);
+    this.recognizeText(imageDataUrl);
+}
+
+async recognizeText(imageDataUrl) {
+    this.updateStatus('Распознавание...');
+    this.captureBtn.disabled = true;
+
+    try {
+        const { data: { text } } = await this.worker.recognize(imageDataUrl);
+
+        if (text.trim()) {
+            this.recognizedText += text.trim() + '\n\n';
+            this.resultDiv.textContent = this.recognizedText;
+            this.downloadBtn.disabled = false;
+            this.updateStatus('Готово! Текст распознан');
+        } else {
+            this.updateStatus('Текст не распознан. Попробуйте другой снимок');
+        }
+    } catch (error) {
+        this.handleError('Ошибка распознавания: ' + error.message);
+    } finally {
+        this.captureBtn.disabled = false;
+    }
+}
+
+downloadTextFile() {
+    if (!this.recognizedText.trim()) {
+        alert('Нет текста для сохранения');
+        return;
+    }
+
+    const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+updateStatus(message) {
+    this.statusDiv.textContent = message;
+}
+
+handleError(message) {
+    this.updateStatus('ОШИБКА: ' + message);
+    console.error(message);
+    alert(message);
+}
+}
+
+// Запускаем приложение после полной загрузки страницы
+document
