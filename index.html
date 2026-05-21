@@ -117,10 +117,8 @@
             async initOCR() {
                 try {
                     this.updateStatus('Создание OCR‑воркера...');
-                    // В Tesseract v6 createWorker принимает язык, OEM и опции сразу
-                    // Параметр OEM: 1 = LSTM (нейросеть), подходит для кириллицы
+                    // Убираем langPath – язык загрузится из облака
                     this.worker = await Tesseract.createWorker('rus', 1, {
-                        langPath: './lang/',           // папка с файлом rus.traineddata
                         logger: info => {
                             if (info.status === 'recognizing text') {
                                 this.updateProgress(`${Math.round(info.progress * 100)}%`);
@@ -132,7 +130,6 @@
                     throw new Error('Ошибка загрузки Tesseract: ' + error.message);
                 }
             }
-
             showLoading(show) {
                 this.loadingDiv.style.display = show ? 'block' : 'none';
             }
