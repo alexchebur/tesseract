@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>OCR с камеры (кириллица) - Улучшенная версия</title>
+    <title>OCR с камеры (кириллица) – Исправленный</title>
     <style>
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 800px;
@@ -19,21 +18,18 @@
             background: #f5f5f5;
             color: #333;
         }
-
         .container {
             background: white;
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
         h1 {
             font-size: 24px;
             margin-bottom: 15px;
             color: #1a1a1a;
             text-align: center;
         }
-
         .video-container {
             position: relative;
             width: 100%;
@@ -42,20 +38,17 @@
             border: 2px solid #ddd;
             background: #000;
         }
-
         #video {
             width: 100%;
             display: block;
-            transform: scaleX(-1); /* Зеркалируем для фронталки, убираем если задняя */
+            /* Зеркалирование убрано, используется задняя камера без переворота */
         }
-
         .controls {
             display: flex;
             gap: 10px;
             margin: 15px 0;
             flex-wrap: wrap;
         }
-
         button {
             flex: 1;
             min-width: 140px;
@@ -73,32 +66,22 @@
             justify-content: center;
             gap: 8px;
         }
-
         button:hover:not(:disabled) {
             background: #0056b3;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(0,123,255,0.3);
         }
-
-        button:active:not(:disabled) {
-            transform: translateY(0);
-        }
-
         button:disabled {
             background: #ccc;
             cursor: not-allowed;
             transform: none;
         }
-
         .btn-secondary {
             background: #28a745;
         }
-
         .btn-secondary:hover:not(:disabled) {
             background: #218838;
-            box-shadow: 0 4px 12px rgba(40,167,69,0.3);
         }
-
         .status-bar {
             background: #f8f9fa;
             padding: 12px;
@@ -110,11 +93,6 @@
             align-items: center;
             gap: 8px;
         }
-
-        .status-icon {
-            font-size: 20px;
-        }
-
         .progress-container {
             margin: 15px 0;
             background: #e9ecef;
@@ -122,30 +100,22 @@
             overflow: hidden;
             height: 6px;
         }
-
         .progress-bar {
             height: 100%;
             background: linear-gradient(90deg, #007bff, #00d4ff);
             transition: width 0.3s ease;
             border-radius: 20px;
         }
-
-        .result-container {
-            margin-top: 20px;
-        }
-
         .result-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
-
         h3 {
             font-size: 18px;
             color: #333;
         }
-
         .char-count {
             font-size: 14px;
             color: #666;
@@ -153,7 +123,6 @@
             padding: 4px 12px;
             border-radius: 12px;
         }
-
         #result {
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -169,19 +138,16 @@
             color: #333;
             font-family: 'Segoe UI', Arial, sans-serif;
         }
-
         #result:empty::before {
             content: 'Текст появится здесь после распознавания...';
             color: #999;
             font-style: italic;
         }
-
         .loading {
             text-align: center;
             padding: 30px;
             color: #007bff;
         }
-
         .spinner {
             display: inline-block;
             width: 40px;
@@ -191,12 +157,10 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
         .error-message {
             background: #fff3f3;
             border: 1px solid #ffcdd2;
@@ -206,28 +170,14 @@
             margin: 10px 0;
             display: none;
         }
-
         .error-message.show {
             display: block;
         }
-
         @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            
-            .container {
-                padding: 15px;
-            }
-            
-            h1 {
-                font-size: 20px;
-            }
-            
-            button {
-                font-size: 14px;
-                padding: 12px 15px;
-            }
+            body { padding: 10px; }
+            .container { padding: 15px; }
+            h1 { font-size: 20px; }
+            button { font-size: 14px; padding: 12px 15px; }
         }
     </style>
 </head>
@@ -276,7 +226,7 @@
         </div>
     </div>
 
-    <!-- Подключаем Tesseract -->
+    <!-- Локальный Tesseract -->
     <script src="./js/tesseract.min.js"></script>
     
     <script>
@@ -298,11 +248,10 @@
                 this.worker = null;
                 this.isProcessing = false;
 
-                // Проверяем наличие Tesseract
                 if (typeof Tesseract !== 'undefined') {
                     this.init();
                 } else {
-                    this.showError('Библиотека Tesseract не загрузилась. Проверьте подключение.');
+                    this.showError('Библиотека Tesseract не загрузилась.');
                 }
             }
 
@@ -310,33 +259,24 @@
                 try {
                     this.showLoading(true);
                     this.hideError();
-
-                    // Инициализация OCR с лучшей моделью
                     await this.initOCR();
 
-                    // Запрос камеры с максимальным разрешением
+                    // Задняя камера, без зеркалирования
                     const stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 4096 },
-                            height: { ideal: 2160 },
-                            aspectRatio: { ideal: 1.777 }
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
                         }
                     });
-                    
                     this.video.srcObject = stream;
-                    
-                    // Ждём готовности видео
                     await new Promise((resolve) => {
-                        this.video.onloadedmetadata = () => {
-                            resolve();
-                        };
+                        this.video.onloadedmetadata = () => resolve();
                     });
 
                     this.captureBtn.disabled = false;
                     this.updateStatus('✅ Камера готова. Нажмите кнопку для распознавания');
                     this.showLoading(false);
-                    
                 } catch (error) {
                     this.handleError('Ошибка инициализации: ' + error.message);
                     this.showLoading(false);
@@ -345,13 +285,9 @@
 
             async initOCR() {
                 try {
-                    this.updateStatus('🔄 Загрузка языковой модели (rus_best)...');
-                    
-                    // Используем лучшую модель с CDN
+                    this.updateStatus('🔄 Загрузка лучшей модели (rus_best)...');
                     this.worker = await Tesseract.createWorker('rus', 3, {
                         langPath: 'https://tessdata.main.quest/',
-                        // Резервный CDN если основной недоступен:
-                        // langPath: 'https://raw.githubusercontent.com/naptha/tessdata_best/main/',
                         logger: info => {
                             if (info.status === 'recognizing text') {
                                 const progress = Math.round(info.progress * 100);
@@ -362,39 +298,24 @@
                             }
                         }
                     });
-
-                    // Настройка параметров для лучшего качества
                     await this.worker.setParameters({
                         tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-                        tessedit_ocr_engine_mode: 3,
-                        textord_heavy_nr: 1,
-                        textord_tabfind_find_tables: 0,
                     });
-
-                    this.updateStatus('✅ Модель готова к работе');
-                    
+                    this.updateStatus('✅ Модель готова');
                 } catch (error) {
-                    // Если лучшая модель недоступна, пробуем стандартную
                     console.warn('Не удалось загрузить rus_best, пробуем стандартную:', error);
-                    this.updateStatus('⚠️ Пробуем стандартную модель...');
-                    
-                    try {
-                        this.worker = await Tesseract.createWorker('rus', 3, {
-                            logger: info => {
-                                if (info.status === 'recognizing text') {
-                                    this.updateProgress(Math.round(info.progress * 100));
-                                }
+                    this.updateStatus('⚠️ Загружаем стандартную модель...');
+                    this.worker = await Tesseract.createWorker('rus', 3, {
+                        logger: info => {
+                            if (info.status === 'recognizing text') {
+                                this.updateProgress(Math.round(info.progress * 100));
                             }
-                        });
-                        
-                        await this.worker.setParameters({
-                            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
-                        });
-                        
-                        this.updateStatus('✅ Стандартная модель готова');
-                    } catch (fallbackError) {
-                        throw new Error('Не удалось загрузить ни одну модель: ' + fallbackError.message);
-                    }
+                        }
+                    });
+                    await this.worker.setParameters({
+                        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                    });
+                    this.updateStatus('✅ Стандартная модель готова');
                 }
             }
 
@@ -403,7 +324,6 @@
                     this.updateStatus('⚠️ Подождите, идёт обработка...');
                     return;
                 }
-
                 if (!this.video.videoWidth || !this.video.videoHeight) {
                     this.showError('Видеопоток не готов');
                     return;
@@ -415,135 +335,69 @@
                 try {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
-                    // Оптимальный размер для OCR
-                    const MAX_WIDTH = 2500;
+
+                    // Ограничиваем ширину для скорости
+                    const MAX_WIDTH = 2000;
                     let width = this.video.videoWidth;
                     let height = this.video.videoHeight;
-                    
                     if (width > MAX_WIDTH) {
                         height = Math.round((height * MAX_WIDTH) / width);
                         width = MAX_WIDTH;
                     }
-                    
                     canvas.width = width;
                     canvas.height = height;
 
-                    // Отражаем по горизонтали если нужно (для фронталки)
-                    ctx.save();
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(this.video, -width, 0, width, height);
-                    ctx.restore();
+                    // Рисуем БЕЗ зеркалирования
+                    ctx.drawImage(this.video, 0, 0, width, height);
 
-                    // Если камера задняя, используем обычное отображение:
-                    // ctx.drawImage(this.video, 0, 0, width, height);
+                    // Простая, но эффективная предобработка
+                    this.simplePreprocess(canvas, ctx, width, height);
 
-                    // Применяем улучшенную предобработку
-                    this.preprocessImage(canvas, ctx, width, height);
-
-                    const imageDataUrl = canvas.toDataURL('image/png', 1.0);
+                    const imageDataUrl = canvas.toDataURL('image/png');
                     this.recognizeText(imageDataUrl);
-                    
                 } catch (error) {
-                    this.handleError('Ошибка при захвате: ' + error.message);
+                    this.handleError('Ошибка захвата: ' + error.message);
                     this.isProcessing = false;
                     this.captureBtn.disabled = false;
                 }
             }
 
-            preprocessImage(canvas, ctx, width, height) {
-                // Получаем данные изображения
+            simplePreprocess(canvas, ctx, width, height) {
+                // Простой адаптивный порог на основе средней яркости
                 const imageData = ctx.getImageData(0, 0, width, height);
                 const data = imageData.data;
-
-                // Шаг 1: Конвертация в оттенки серого
-                const gray = new Float32Array(width * height);
+                
+                // Считаем среднюю яркость
+                let totalBrightness = 0;
                 for (let i = 0; i < data.length; i += 4) {
-                    const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                    gray[i / 4] = luminance;
+                    // luminance
+                    totalBrightness += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                 }
-
-                // Шаг 2: Адаптивная бинаризация (метод Сауволы)
-                const windowSize = Math.floor(Math.min(width, height) / 40); // ~2.5% от размера
-                const k = 0.2; // Чувствительность
-                const R = 128; // Стандартное отклонение
-
-                // Вычисляем интегральные изображения для быстрого расчёта
-                const integralImg = new Float64Array((width + 1) * (height + 1));
-                const integralSqImg = new Float64Array((width + 1) * (height + 1));
-
-                for (let y = 0; y < height; y++) {
-                    let sum = 0;
-                    let sumSq = 0;
-                    for (let x = 0; x < width; x++) {
-                        const idx = y * width + x;
-                        const val = gray[idx];
-                        sum += val;
-                        sumSq += val * val;
-                        
-                        const aboveIdx = y * (width + 1) + (x + 1);
-                        const currentIdx = (y + 1) * (width + 1) + (x + 1);
-                        
-                        integralImg[currentIdx] = integralImg[aboveIdx] + sum;
-                        integralSqImg[currentIdx] = integralSqImg[aboveIdx] + sumSq;
-                    }
+                const avgBrightness = totalBrightness / (width * height);
+                
+                // Порог = средняя яркость минус константа (подобрана эмпирически)
+                const threshold = Math.max(40, Math.min(200, avgBrightness - 30));
+                
+                // Бинаризация
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    const val = gray > threshold ? 255 : 0;
+                    data[i] = data[i + 1] = data[i + 2] = val;
                 }
-
-                // Применяем адаптивный порог
-                const halfWindow = Math.floor(windowSize / 2);
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const x1 = Math.max(0, x - halfWindow);
-                        const y1 = Math.max(0, y - halfWindow);
-                        const x2 = Math.min(width - 1, x + halfWindow);
-                        const y2 = Math.min(height - 1, y + halfWindow);
-                        
-                        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
-                        
-                        // Сумма в окне через интегральное изображение
-                        const sum = integralImg[(y2 + 1) * (width + 1) + (x2 + 1)]
-                                  - integralImg[(y1) * (width + 1) + (x2 + 1)]
-                                  - integralImg[(y2 + 1) * (width + 1) + (x1)]
-                                  + integralImg[(y1) * (width + 1) + (x1)];
-                        
-                        const sumSq = integralSqImg[(y2 + 1) * (width + 1) + (x2 + 1)]
-                                    - integralSqImg[(y1) * (width + 1) + (x2 + 1)]
-                                    - integralSqImg[(y2 + 1) * (width + 1) + (x1)]
-                                    + integralSqImg[(y1) * (width + 1) + (x1)];
-                        
-                        const mean = sum / count;
-                        const variance = (sumSq / count) - (mean * mean);
-                        const stdDev = Math.sqrt(Math.max(0, variance));
-                        
-                        const threshold = mean * (1 + k * ((stdDev / R) - 1));
-                        
-                        const idx = (y * width + x) * 4;
-                        const pixelValue = gray[y * width + x];
-                        const binaryValue = pixelValue < threshold ? 0 : 255;
-                        
-                        data[idx] = binaryValue;
-                        data[idx + 1] = binaryValue;
-                        data[idx + 2] = binaryValue;
-                    }
-                }
-
                 ctx.putImageData(imageData, 0, 0);
             }
 
             async recognizeText(imageDataUrl) {
-                this.updateStatus('🔍 Распознавание текста...');
-                
+                this.updateStatus('🔍 Распознавание...');
                 try {
                     const { data: { text, confidence } } = await this.worker.recognize(imageDataUrl);
-
                     if (text.trim()) {
                         this.recognizedText += text.trim() + '\n\n';
                         this.resultDiv.textContent = this.recognizedText;
                         this.downloadBtn.disabled = false;
                         this.updateCharCount();
-                        
-                        const avgConfidence = confidence ? Math.round(confidence) : 'N/A';
-                        this.updateStatus(`✅ Распознано (точность: ${avgConfidence}%)`);
+                        const avgConf = confidence ? Math.round(confidence) : 'N/A';
+                        this.updateStatus(`✅ Распознано (точность: ${avgConf}%)`);
                     } else {
                         this.updateStatus('⚠️ Текст не найден. Попробуйте снять чётче');
                     }
@@ -568,17 +422,9 @@
                     alert('Нет текста для сохранения');
                     return;
                 }
-
-                const timestamp = new Date().toISOString()
-                    .replace(/[:.]/g, '-')
-                    .replace('T', '_')
-                    .substring(0, 19);
-                
-                const blob = new Blob(['\ufeff' + this.recognizedText], { 
-                    type: 'text/plain;charset=utf-8' 
-                });
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                const blob = new Blob(['\ufeff' + this.recognizedText], { type: 'text/plain;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
-
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `распознанный_текст_${timestamp}.txt`;
@@ -586,7 +432,6 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-                
                 this.updateStatus('💾 Файл сохранён');
             }
 
@@ -624,34 +469,21 @@
             }
         }
 
-        // Запуск приложения
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const app = new OCRApp();
-
-                document.getElementById('captureBtn').addEventListener('click', () => {
-                    app.captureAndRecognize();
-                });
-
-                document.getElementById('downloadBtn').addEventListener('click', () => {
-                    app.downloadTextFile();
-                });
-
-                document.getElementById('clearBtn').addEventListener('click', () => {
-                    app.clearText();
-                });
-
+                document.getElementById('captureBtn').addEventListener('click', () => app.captureAndRecognize());
+                document.getElementById('downloadBtn').addEventListener('click', () => app.downloadTextFile());
+                document.getElementById('clearBtn').addEventListener('click', () => app.clearText());
             } catch (error) {
                 console.error('Критическая ошибка:', error);
                 alert('Не удалось запустить приложение: ' + error.message);
             }
         });
 
-        // Обработка ошибок загрузки Tesseract
         window.addEventListener('error', function(e) {
             if (e.target.tagName === 'SCRIPT') {
-                console.error('Ошибка загрузки Tesseract:', e);
-                alert('Не удалось загрузить библиотеку Tesseract. Проверьте подключение к интернету.');
+                alert('Не удалось загрузить библиотеку Tesseract.');
             }
         }, true);
     </script>
