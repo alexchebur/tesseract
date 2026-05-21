@@ -45,6 +45,11 @@
             font-style: italic;
             margin: 5px 0;
         }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #007bff;
+        }
     </style>
 </head>
 <body>
@@ -53,7 +58,12 @@
     <video id="video" autoplay playsinline></video>
     <button id="captureBtn" disabled>Сделать снимок и распознать</button>
     <button id="downloadBtn" disabled>Скачать TXT</button>
+
     <div class="status" id="status">Загрузка Tesseract...</div>
+    <div id="loadingIndicator" class="loading">
+        <p>Идёт инициализация OCR...</p>
+        <p id="progressText">0%</p>
+    </div>
 
     <h3>Распознанный текст:</h3>
     <div id="result"></div>
@@ -68,6 +78,8 @@
                 this.downloadBtn = document.getElementById('downloadBtn');
                 this.resultDiv = document.getElementById('result');
                 this.statusDiv = document.getElementById('status');
+                this.progressDiv = document.getElementById('progressText');
+                this.loadingDiv = document.getElementById('loadingIndicator');
 
                 this.capturedImages = [];
                 this.recognizedText = '';
@@ -83,42 +95,64 @@
 
             async init() {
                 try {
-                    // Инициализируем Tesseract с указанием пути к языковым данным
-                    this.worker = await Tesseract.createWorker({
+                    // Показываем индикатор загрузки
+                    this.showLoading(true);
+
+                    // Инициализируем Tesseract с подробной логикой
+                    await this.initOCR();
+
+                    // Запрашиваем доступ к камере
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment'
+                }
+            });
+            this.video.srcObject = stream;
+
+            // Активируем кнопки
+            this.captureBtn.disabled = false;
+            this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
+            this.showLoading(false);
+        } catch (error) {
+            this.handleError('Ошибка инициализации: ' + error.message);
+            this.showLoading(false);
+        }
+    }
+
+    async initOCR() {
+        try {
+            this.worker = await Tesseract.createWorker({
                 logger: info => {
-                    if (info.status === 'recognizing text') {
-                this.updateStatus(`Распознавание: ${Math.round(info.progress * 100)}%`);
+                    console.log('Tesseract status:', info);
+
+            if (info.status === 'recognizing text') {
+                this.updateProgress(`${Math.round(info.progress * 100)}%`);
             } else if (info.status === 'loading language') {
                 this.updateStatus('Загрузка языковых данных...');
+            } else if (info.status === 'initializing') {
+                this.updateStatus('Инициализация OCR...');
             } else if (info.status.includes('loaded')) {
                 this.updateStatus('Компоненты загружены');
             }
         }
     });
 
-    // Явно указываем путь к языковым данным для GitHub Pages
+    // Загружаем язык с явным указанием пути
     await this.worker.loadLanguage('rus');
     await this.worker.initialize('rus', {
-        // Указываем путь относительно корня сайта
         langPath: './lang/'
     });
-
-    this.updateStatus('Tesseract готов. Запрашиваем доступ к камере...');
-
-    // Запрашиваем доступ к камере
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: 'environment'
-        }
-    });
-    this.video.srcObject = stream;
-
-    // Активируем кнопку после успешной инициализации
-    this.captureBtn.disabled = false;
-    this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
 } catch (error) {
-    this.handleError('Ошибка инициализации: ' + error.message);
+    throw new Error('Ошибка загрузки Tesseract: ' + error.message);
 }
+}
+
+showLoading(show) {
+    this.loadingDiv.style.display = show ? 'block' : 'none';
+}
+
+updateProgress(progress) {
+    this.progressDiv.textContent = progress;
 }
 
 captureAndRecognize() {
@@ -129,62 +163,4 @@ captureAndRecognize() {
 
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.width = this.video.videoWidth;
-    canvas.height = this.video.videoHeight;
-    context.drawImage(this.video, 0, 0);
-
-    const imageDataUrl = canvas.toDataURL('image/png');
-    this.capturedImages.push(imageDataUrl);
-    this.recognizeText(imageDataUrl);
-}
-
-async recognizeText(imageDataUrl) {
-    this.updateStatus('Распознавание...');
-    this.captureBtn.disabled = true;
-
-    try {
-        const { data: { text } } = await this.worker.recognize(imageDataUrl);
-
-        if (text.trim()) {
-            this.recognizedText += text.trim() + '\n\n';
-            this.resultDiv.textContent = this.recognizedText;
-            this.downloadBtn.disabled = false;
-            this.updateStatus('Готово! Текст распознан');
-        } else {
-            this.updateStatus('Текст не распознан. Попробуйте другой снимок');
-        }
-    } catch (error) {
-        this.handleError('Ошибка распознавания: ' + error.message);
-    } finally {
-        this.captureBtn.disabled = false;
-    }
-}
-
-downloadTextFile() {
-    if (!this.recognizedText.trim()) {
-        alert('Нет текста для сохранения');
-        return;
-    }
-
-    const blob = new Blob([this.recognizedText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'распознанный_текст_' + new Date().toISOString().split('T')[0] + '.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-updateStatus(message) {
-    this.statusDiv.textContent = message;
-}
-
-handleError(message) {
-    this.updateStatus('ОШИБКА: ' + message);
-    console.error(message);
-    alert(message);
-}
-}
+    canvas.width
