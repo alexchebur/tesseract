@@ -68,7 +68,7 @@
     <h3>Распознанный текст:</h3>
     <div id="result"></div>
 
-    <!-- Подключаем Tesseract локально (убедитесь, что файл в ./js/tesseract.min.js) -->
+    <!-- Подключаем Tesseract локально -->
     <script src="./js/tesseract.min.js"></script>
     <script>
         class OCRApp {
@@ -94,17 +94,23 @@
 
             async init() {
                 try {
+                    // Показываем индикатор загрузки
                     this.showLoading(true);
 
-                    // Инициализация OCR (новый API Tesseract v6)
+                    // Инициализируем Tesseract
                     await this.initOCR();
 
-                    // Запрашиваем доступ к камере
+                    // Запрашиваем доступ к камере с высоким разрешением
                     const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' }
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        }
                     });
                     this.video.srcObject = stream;
 
+                    // Активируем кнопки
                     this.captureBtn.disabled = false;
                     this.updateStatus('Камера готова. Нажмите "Сделать снимок"');
                     this.showLoading(false);
@@ -117,19 +123,27 @@
             async initOCR() {
                 try {
                     this.updateStatus('Создание OCR‑воркера...');
-                    // Убираем langPath – язык загрузится из облака
-                    this.worker = await Tesseract.createWorker('rus', 1, {
+                    
+                    // Создаем воркер с русским и английским языками, OEM 3 (комбинированный режим)
+                    this.worker = await Tesseract.createWorker('rus+eng', 3, {
                         logger: info => {
                             if (info.status === 'recognizing text') {
                                 this.updateProgress(`${Math.round(info.progress * 100)}%`);
                             }
                         }
                     });
+                    
+                    // Устанавливаем режим сегментации страницы (автоматический)
+                    await this.worker.setParameters({
+                        tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+                    });
+                    
                     this.updateStatus('Tesseract готов к работе');
                 } catch (error) {
                     throw new Error('Ошибка загрузки Tesseract: ' + error.message);
                 }
             }
+
             showLoading(show) {
                 this.loadingDiv.style.display = show ? 'block' : 'none';
             }
@@ -151,12 +165,46 @@
                     return;
                 }
 
+                // Создаем canvas для захвата кадра
                 const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.width = this.video.videoWidth;
-                canvas.height = this.video.videoHeight;
-                context.drawImage(this.video, 0, 0);
-
+                const ctx = canvas.getContext('2d');
+                
+                // Оптимальная ширина для OCR (баланс качество/скорость)
+                const MAX_WIDTH = 1500;
+                let width = this.video.videoWidth;
+                let height = this.video.videoHeight;
+                
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Рисуем изображение с камеры
+                ctx.drawImage(this.video, 0, 0, width, height);
+                
+                // === ПРЕДОБРАБОТКА ИЗОБРАЖЕНИЯ ===
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+                
+                // Переводим в оттенки серого и применяем бинаризацию
+                for (let i = 0; i < data.length; i += 4) {
+                    // Вычисляем яркость пикселя
+                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    
+                    // Бинаризация с порогом (делаем текст черным, фон белым)
+                    const binary = gray > 110 ? 255 : 0;
+                    
+                    data[i] = binary;     // R
+                    data[i + 1] = binary; // G
+                    data[i + 2] = binary; // B
+                    // data[i + 3] - альфа не меняем
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+                
                 const imageDataUrl = canvas.toDataURL('image/png');
                 this.capturedImages.push(imageDataUrl);
                 this.recognizeText(imageDataUrl);
@@ -214,6 +262,7 @@
             try {
                 const app = new OCRApp();
 
+                // Добавляем обработчики событий
                 document.getElementById('captureBtn').addEventListener('click', () => {
                     app.captureAndRecognize();
                 });
