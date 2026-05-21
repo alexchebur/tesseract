@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -125,89 +124,78 @@
             this.worker = await Tesseract.createWorker({
                 logger: info => {
                     const status = info.status;
-                    const progress = info.progress;
+            const progress = info.progress;
 
-                    if (status === 'recognizing text' && progress !== undefined) {
-                        this.updateProgress(`${Math.round(progress * 100)}%`);
-                    } else if (status === 'loading language') {
-                        this.updateStatus('Загрузка языковых данных...');
-                    } else if (status === 'initializing') {
-                        this.updateStatus('Инициализация OCR...');
-                    } else if (status.includes('loaded')) {
-                        this.updateStatus('Компоненты загружены');
-                    }
-                }
-            });
-
-            await this.worker.loadLanguage('rus');
-            await this.worker.initialize('rus', {
-                langPath: './lang/'
-            });
-
-            this.updateStatus('Tesseract готов к работе');
-        } catch (error) {
-            throw new Error('Ошибка загрузки Tesseract: ' + error.message);
-        }
-    }
-
-                // Загружаем язык с явным указанием пути
-                await this.worker.loadLanguage('rus');
-                await this.worker.initialize('rus', {
-                    langPath: './lang/'
-                });
-
-                this.updateStatus('Tesseract готов к работе');
-            } catch (error) {
-                throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+            if (status === 'recognizing text' && progress !== undefined) {
+                this.updateProgress(`${Math.round(progress * 100)}%`);
+            } else if (status === 'loading language') {
+                this.updateStatus('Загрузка языковых данных...');
+            } else if (status === 'initializing') {
+                this.updateStatus('Инициализация OCR...');
+            } else if (status.includes('loaded')) {
+                this.updateStatus('Компоненты загружены');
             }
         }
+    });
 
-    showLoading(show) {
-        this.loadingDiv.style.display = show ? 'block' : 'none';
+    // Загружаем язык с явным указанием пути
+    await this.worker.loadLanguage('rus');
+    await this.worker.initialize('rus', {
+        langPath: './lang/'
+    });
+
+    this.updateStatus('Tesseract готов к работе');
+} catch (error) {
+    throw new Error('Ошибка загрузки Tesseract: ' + error.message);
+}
+}
+
+showLoading(show) {
+    this.loadingDiv.style.display = show ? 'block' : 'none';
+}
+
+updateProgress(progress) {
+    this.progressDiv.textContent = progress;
+}
+
+captureAndRecognize() {
+    if (!this.video.videoWidth || !this.video.videoHeight) {
+        this.handleError('Видеопоток не готов');
+        return;
     }
 
-    updateProgress(progress) {
-        this.progressDiv.textContent = progress;
-    }
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = this.video.videoWidth;
+    canvas.height = this.video.videoHeight;
+    context.drawImage(this.video, 0, 0);
 
-    captureAndRecognize() {
-        if (!this.video.videoWidth || !this.video.videoHeight) {
-            this.handleError('Видеопоток не готов');
-            return;
+    const imageDataUrl = canvas.toDataURL('image/png');
+    this.capturedImages.push(imageDataUrl);
+    this.recognizeText(imageDataUrl);
+}
+
+async recognizeText(imageDataUrl) {
+    this.updateStatus('Распознавание...');
+    this.captureBtn.disabled = true;
+
+    try {
+        const { data: { text } } = await this.worker.recognize(imageDataUrl);
+
+        if (text.trim()) {
+            this.recognizedText += text.trim() + '\n\n';
+            this.resultDiv.textContent = this.recognizedText;
+            this.downloadBtn.disabled = false;
+            this.updateStatus('Готово! Текст распознан');
+        } else {
+            this.updateStatus('Текст не распознан. Попробуйте другой снимок');
         }
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
-        context.drawImage(this.video, 0, 0);
-
-        const imageDataUrl = canvas.toDataURL('image/png');
-        this.capturedImages.push(imageDataUrl);
-        this.recognizeText(imageDataUrl);
+    } catch (error) {
+        this.handleError('Ошибка распознавания: ' + error.message);
+    } finally {
+        this.captureBtn.disabled = false;
     }
-
-    async recognizeText(imageDataUrl) {
-        this.updateStatus('Распознавание...');
-        this.captureBtn.disabled = true;
-
-        try {
-            const { data: { text } } = await this.worker.recognize(imageDataUrl);
-
-            if (text.trim()) {
-                this.recognizedText += text.trim() + '\n\n';
-                this.resultDiv.textContent = this.recognizedText;
-                this.downloadBtn.disabled = false;
-                this.updateStatus('Готово! Текст распознан');
-            } else {
-                this.updateStatus('Текст не распознан. Попробуйте другой снимок');
-            }
-       } catch (error) {
-            this.handleError('Ошибка распознавания: ' + error.message);
-        } finally {
-            this.captureBtn.disabled = false;
-        }
-    }
+}
 
 downloadTextFile() {
     if (!this.recognizedText.trim()) {
@@ -239,9 +227,26 @@ handleError(message) {
 }
 
 // Запускаем приложение после полной загрузки страницы
-document.addEventListener('DOMContentLoaded', () => {
-    new OCRApp();
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const app = new OCRApp();
+        await app.init();
+
+        // Добавляем обработчики событий
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            app.captureAndRecognize();
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            app.downloadTextFile();
+        });
+    } catch (error) {
+        console.error('Критическая ошибка при запуске приложения:', error);
+        alert('Не удалось запустить приложение: ' + error.message);
+    }
 });
-    </script>
+</script>
 </body>
 </html>
+
+            
